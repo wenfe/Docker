@@ -1,0 +1,39 @@
+name: Publish data science image
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Build image
+        run: docker build --pull --tag ghcr.io/wenfe/docker:latest .
+
+      - name: Verify entrypoint
+        run: docker run --rm ghcr.io/wenfe/docker:latest --version
+
+      - name: Sign in to GitHub Container Registry
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
+        run: printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$REGISTRY_USER" --password-stdin
+
+      - name: Push and verify image
+        run: |
+          docker push ghcr.io/wenfe/docker:latest
+          docker pull ghcr.io/wenfe/docker:latest
+
+      - name: Publish summary
+        run: |
+          echo 'Published: `ghcr.io/wenfe/docker:latest`' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Package: https://github.com/users/wenfe/packages/container/package/docker' >> "$GITHUB_STEP_SUMMARY"
